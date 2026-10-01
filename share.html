@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080a0b">
+  <meta name="description" content="VIVER AR · 카메라로 손목에 시계를 착용해 보세요.">
+  <title>VIVER AR · 시계 착용</title>
+  <link rel="stylesheet" href="./tester.css?v=713">
+  <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+</head>
+<body data-presentation="tester">
+  <main id="stage" class="stage" aria-label="VIVER AR 시계 착용 화면">
+    <video id="camera" autoplay muted playsinline aria-label="카메라 영상"></video>
+    <canvas id="scene" aria-label="손목에 착용한 시계"></canvas>
+    <canvas id="tracking-debug" hidden aria-hidden="true"></canvas>
+  </main>
+  <section id="tester-entry" class="entry" aria-labelledby="tester-title">
+    <div class="entry-content">
+      <p class="wordmark">VIVER <span>AR</span></p>
+      <h1 id="tester-title">손목 위에서 만나보세요.</h1>
+      <p id="tester-message" class="entry-message" role="status">손등과 손가락을 화면에 담고<br>약 2초 동안 가만히 보여 주세요.</p>
+      <p id="tester-error" class="entry-error" role="alert" hidden></p>
+      <button id="start" class="start-button" type="button">카메라 시작</button>
+      <p class="privacy">카메라 영상은 기기 안에서만 처리됩니다.</p>
+    </div>
+  </section>
+  <p id="tester-hint" class="hint" role="status" aria-live="polite" hidden>손등과 손가락을 펴고 잠깐 멈춰 주세요.</p>
+  <button id="calibrate" class="retrack" type="button" disabled hidden>
+    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M15.9 6.8A6.5 6.5 0 1 0 16.5 10M15.9 6.8V2.9m0 3.9H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    손등 재추적
+  </button>
+  <!-- Shared engine controls are inert in the tester presentation. -->
+  <div hidden aria-hidden="true">
+    <span id="status"></span><span id="error" hidden></span>
+    <span id="mode-label"></span><span id="camera-label"></span><span id="tracking-label"></span><span id="fps"></span>
+    <button id="switch" disabled></button><button id="align-dial"></button><button id="reset"></button><button id="sample"></button>
+    <input id="rear-assist" type="checkbox" checked><input id="rear-axis" type="checkbox" checked><input id="occlusion" type="checkbox" checked>
+    <input id="debug" type="checkbox"><input id="wrist-guide" type="checkbox">
+    <span id="debug-info"></span><span id="recording-status"></span><span id="recording-help"></span>
+    <button id="record-diagnostics"></button><button id="save-diagnostics" disabled></button><button id="clear-diagnostics" disabled></button>
+    <input id="model-file" type="file" accept=".glb,model/gltf-binary"><span id="model-name"></span><span id="model-caption"></span><span id="model-status"></span><span id="fit-saved"></span>
+    <input id="scale" type="number" value="1.35"><output id="scale-output"></output>
+    <input id="offset" type="number" value="0.5"><output id="offset-output"></output>
+    <input id="rotation" type="number" value="90"><output id="rotation-output"></output>
+    <input id="wrist-width" type="number" value="1.3"><output id="wrist-width-output"></output>
+    <input id="wrist-depth" type="number" value="1.4"><output id="wrist-depth-output"></output>
+    <input id="tilt-x" type="number" value="0"><output id="tilt-x-output"></output>
+    <input id="tilt-y" type="number" value="0"><output id="tilt-y-output"></output>
+    <input id="height" type="number" value="0"><output id="height-output"></output>
+  </div>
+  <noscript><p class="no-script">카메라 착용을 시작하려면 JavaScript를 허용해 주세요.</p></noscript>
+  <script type="module" src="./app.js?v=713"></script>
+</body>
+</html>
