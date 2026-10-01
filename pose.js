@@ -25,7 +25,7 @@ const finitePoint = p => p && [p.x, p.y, p.z].every(Number.isFinite);
 const Z = new Vector3(0, 0, 1), Y = new Vector3(0, 1, 0);
 const halfTurn = new Quaternion().setFromAxisAngle(Y, Math.PI);
 
-export function estimateWristPose(landmarks, view, { mirror = false, offset = 0.38, scale = 1, worldLandmarks } = {}) {
+export function estimateWristPose(landmarks, view, { mirror = false, offset = 0.38, scale = 1, worldLandmarks, calibrationBounds = 'viewport' } = {}) {
   if (!landmarks || landmarks.length !== 21) return null;
   if (PALM.some(i => !finitePoint(landmarks[i]))) return null;
   const observed = PALM.map(i => landmarkPoint(landmarks[i], view, mirror));
@@ -104,7 +104,15 @@ export function estimateWristPose(landmarks, view, { mirror = false, offset = 0.
     }
   }
   const allPoints = landmarks.every(finitePoint) ? landmarks.map(p=>landmarkPoint(p,view,mirror)) : [];
-  const inFrame = allPoints.length === 21 && allPoints.every(p=>Math.abs(p.x)<view.width*.48 && Math.abs(p.y)<view.height*.48);
+  const onScreen = p => Math.abs(p.x)<view.width*.48 && Math.abs(p.y)<view.height*.48;
+  // Fullscreen cover can crop fingertips that remain present in the actual
+  // detector input. For the tester view, validate that input instead of the
+  // decorative crop, while keeping the wrist and palm center in the viewport.
+  // A genuinely clipped camera input must still fail the initial gate.
+  const inFrame = allPoints.length === 21 && (calibrationBounds === 'camera'
+    ? landmarks.every(p=>p.x>.02 && p.x<.98 && p.y>.02 && p.y<.98) &&
+      onScreen(wrist) && onScreen(position) && onScreen(screen.slice(1).reduce((sum,p)=>sum.add(p),new Vector3()).multiplyScalar(.25))
+    : allPoints.every(onScreen));
   // Geometric eligibility, not an occlusion classifier: inferred landmarks
   // can still be wrong. Require extended fingers only while learning a palm.
   const open = allPoints.length === 21 && [5,9,13,17].every(i=>

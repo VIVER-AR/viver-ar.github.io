@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { estimateWristPose, landmarkPoint, WristPoseTracker, smoothingAlpha, watchRotationDegrees } from './pose.js?v=712';
+import { estimateWristPose, landmarkPoint, WristPoseTracker, smoothingAlpha, watchRotationDegrees } from './pose.js?v=714';
 import { calibrationPrompt } from './initial-calibration.js?v=78';
 import { RearPalmAxis } from './rear-axis.js?v=79';
 import { HandDetector } from './hand-detector.js?v=75';
@@ -11,7 +11,7 @@ import { HandTarget } from './hand-target.js?v=73';
 import { makeSampleWatch, disposeModel, inspectGLB } from './watch.js?v=74';
 import { WristRig, wristDimensions } from './wrist-rig.js?v=71';
 import { DiagnosticRecorder } from './diagnostic-recorder.js?v=711';
-import { createTesterView } from './tester-view.js?v=713';
+import { createTesterView } from './tester-view.js?v=714';
 
 import { FIT_CONTROLS, FitSettings, defaultFit } from './fit-settings.js?v=7';
 
@@ -203,7 +203,7 @@ async function detect(time) {
     const selected = handTarget.select(result, view, time, { allowRelocation: mirror || assistEnabled });
     const landmarks = selected === null ? null : result.landmarks[selected];
     const worldLandmarks = selected === null ? null : result.worldLandmarks?.[selected];
-    const next = estimateWristPose(landmarks, view, { mirror, offset: values.offset, scale: values.scale, worldLandmarks });
+    const next = estimateWristPose(landmarks, view, { mirror, offset: values.offset, scale: values.scale, worldLandmarks, calibrationBounds: testerView ? 'camera' : 'viewport' });
     const observation = assistEnabled ? rearObservation(next, landmarks, tracker, visual) : {allowed:true};
     const accepted = tracker.update(observation.allowed ? next : null, time);
     const displayPose = accepted && tracker.orientationSign && rearAxisEnabled()
@@ -285,7 +285,7 @@ function render(time) {
     occluder.visible = $('occlusion').checked;
   }
   renderer.render(scene, camera);
-  testerView?.tracking(tracker.orientationSign);
+  testerView?.tracking(tracker.orientationSign, tracker.diagnostics);
   if (diagnosticRecorder.active) {
     const watchVisible = mode === 'live' && anchor.visible;
     diagnosticRecorder.recordRender({ time, mode, operation, watchVisible, inferenceTime: debugFrame?.time ?? null,
@@ -426,7 +426,7 @@ $('save-diagnostics').addEventListener('click',()=>{
   if(!diagnosticRecorder.frames.length && !diagnosticRecorder.renders.length)return;
   const time = performance.now(); diagnosticRecorder.stop(time, 'save');
   updateDiagnosticUi(time, true);
-  const blob=new Blob([JSON.stringify(diagnosticRecorder.export(time, {version:'0.7.13',engine,timeOrigin:performance.timeOrigin}))],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(diagnosticRecorder.export(time, {version:'0.7.14',engine,timeOrigin:performance.timeOrigin}))],{type:'application/json'});
   const url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='wrist-diagnostics.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 $('start').addEventListener('click', () => mode === 'idle' ? startCamera() : stopCamera());

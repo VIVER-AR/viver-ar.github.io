@@ -822,6 +822,41 @@ test('startup sees cover-cropped fingers even when sensor coordinates are in bou
   const pose=estimateWristPose(hand.landmarks,narrow,{worldLandmarks:hand.world});
   assert.ok(hand.landmarks.every(p=>p.x>0&&p.x<1));assert.equal(pose.calibration.inFrame,false);
 });
+
+test('tester startup accepts camera-visible fingers outside the display crop',()=>{
+  for(const [width,height] of [[250,1000],[1000,550]])for(const mirror of [false,true])for(const right of [false,true]){
+    const hand=rotatedHand(0,right),view={...rotationView,width,height};
+    const options={worldLandmarks:hand.world,mirror,offset:.5};
+    const prior=estimateWristPose(hand.landmarks,view,options);
+    const next=estimateWristPose(hand.landmarks,view,{...options,calibrationBounds:'camera'});
+    assert.equal(prior.calibration.inFrame,false);
+    assert.equal(next.calibration.inFrame,true);
+    assert.ok(prior.position.distanceTo(next.position)<1e-9);
+    assert.ok(prior.rotation.angleTo(next.rotation)<1e-7);
+    const oldTracker=new WristPoseTracker(),tracker=new WristPoseTracker();
+    for(let t=0;t<=1600;t+=100){
+      oldTracker.update(prior,t);tracker.update(next,t);
+      if(t<1500)assert.equal(tracker.orientationSign,0,'stable dwell still required');
+    }
+    assert.equal(oldTracker.orientationSign,0);
+    assert.ok(tracker.orientationSign);assert.ok(tracker.sample(1600));
+  }
+});
+
+test('tester startup still rejects actually cropped input and offscreen wrists',()=>{
+  for(const kind of ['camera-edge','invalid','offscreen-hand','offscreen-watch']){
+    const hand=rotatedHand(0),view={...rotationView,width:250,height:1000};
+    if(kind==='camera-edge')hand.landmarks[12].x=1.01;
+    if(kind==='invalid')hand.landmarks[12].y=NaN;
+    if(kind==='offscreen-hand')for(const p of hand.landmarks)p.x+=.16;
+    if(kind==='offscreen-watch'){view.width=1000;view.height=300;}
+    const pose=estimateWristPose(hand.landmarks,view,{worldLandmarks:hand.world,offset:.5,calibrationBounds:'camera'});
+    assert.equal(pose.calibration.inFrame,false,kind);
+    const tracker=new WristPoseTracker();
+    for(let t=0;t<=3000;t+=100)tracker.update(pose,t);
+    assert.equal(tracker.orientationSign,0,kind);
+  }
+});
 test('slow continuous movement cannot drag the startup reference along with it',()=>{
   for(const kind of ['rotation','translation','scale','shape']){
     const tracker=new WristPoseTracker();

@@ -1,4 +1,5 @@
 // Presentation only: the tracker, fit defaults and camera pipeline are shared.
+import { calibrationPrompt } from './initial-calibration.js?v=78';
 export function createTesterView() {
   if (document.body.dataset.presentation !== 'tester') return null;
   const byId = id => document.getElementById(id);
@@ -30,8 +31,14 @@ export function createTesterView() {
         entry.hidden = false;
       } else error.hidden = true;
     },
-    tracking(calibrated) {
-      if (mode === 'live') hint.hidden = !!calibrated;
+    tracking(calibrated, diagnostic) {
+      if (mode !== 'live') return;
+      hint.hidden = !!calibrated;
+      if (!calibrated && diagnostic) {
+        const reason = diagnostic.state === 'missing' ? 'missing' : diagnostic.reason;
+        const prompt = calibrationPrompt({ ...diagnostic, reason });
+        if (hint.textContent !== prompt) hint.textContent = prompt;
+      }
     },
   };
 }
