@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="./tester.css?v=715">
   <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
 </head>
-<body data-presentation="tester">
+<body data-presentation="tester" data-app-version="0.7.19" data-model-state="loading">
   <main id="stage" class="stage" aria-label="VIVER AR 시계 착용 화면">
     <video id="camera" autoplay muted playsinline aria-label="카메라 영상"></video>
     <canvas id="scene" aria-label="손목에 착용한 시계"></canvas>
@@ -21,7 +21,7 @@
       <h1 id="tester-title">손목 위에서 만나보세요.</h1>
       <p id="tester-message" class="entry-message" role="status">손등과 손가락을 화면에 담고<br>약 2초 동안 가만히 보여 주세요.</p>
       <p id="tester-error" class="entry-error" role="alert" hidden></p>
-      <button id="start" class="start-button" type="button">카메라 시작</button>
+      <button id="start" class="start-button" type="button" disabled>시계 준비 중…</button>
       <p class="privacy">카메라 영상은 기기 안에서만 처리됩니다.</p>
     </div>
   </section>
@@ -56,6 +56,6 @@
     <input id="height" type="number" value="0"><output id="height-output"></output>
   </div>
   <noscript><p class="no-script">카메라 착용을 시작하려면 JavaScript를 허용해 주세요.</p></noscript>
-  <script type="module" src="./app.js?v=715"></script>
+  <script type="module" src="./app.js?v=719"></script>
 </body>
 </html>

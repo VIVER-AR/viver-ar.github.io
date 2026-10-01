@@ -23,6 +23,7 @@ for (const name of ['index.html', 'share.html', 'tester.css', 'tester-view.js', 
 }
 // Only active runtime assets are published; retired experiments stay out of the site.
 for (const name of ['three', 'vision']) await cp(path.join(root, 'vendor', name), path.join(output, 'vendor', name), { recursive: true });
+await cp(path.join(root, 'datejust-ar.glb'), path.join(output, 'datejust-ar.glb'));
 await writeFile(path.join(output, '.nojekyll'), '');
 if (shared) await cp(path.join(root, 'share.html'), path.join(output, 'index.html'));
 console.log(`Static site built in ${outputName}/.`);

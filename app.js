@@ -8,13 +8,13 @@ import { RearPalmAxis } from './rear-axis.js?v=79';
 import { HandDetector } from './hand-detector.js?v=75';
 import { RearWristAssist, rearObservation } from './rear-assist.js?v=75';
 import { HandTarget } from './hand-target.js?v=73';
-import { makeSampleWatch, disposeModel, inspectGLB } from './watch.js?v=74';
-import { WristRig, wristDimensions } from './wrist-rig.js?v=71';
+import { makeSampleWatch, disposeModel, inspectGLB, normalizeImportedWatch } from './watch.js?v=719';
+import { WristRig, wristDimensions } from './wrist-rig.js?v=719';
 import { DiagnosticRecorder } from './diagnostic-recorder.js?v=711';
 import { createTesterView } from './tester-view.js?v=715';
 import { TesterReturnRecovery, hasVisiblePalm } from './tester-recovery.js?v=715';
 
-import { FIT_CONTROLS, FitSettings, defaultFit } from './fit-settings.js?v=7';
+import { FIT_CONTROLS, FitSettings, defaultFit } from './fit-settings.js?v=719';
 
 const $ = id => document.getElementById(id);
 const video = $('camera'), stage = $('stage'), status = $('status'), errorBox = $('error');
@@ -23,6 +23,7 @@ const testerRecovery = testerView ? new TesterReturnRecovery() : null;
 const controls = FIT_CONTROLS;
 const engine = 'hand', defaults = defaultFit(engine);
 let modelKey = 'sample';
+let testerModelReady = !testerView;
 let storage; try { storage = window.localStorage; } catch {}
 const fitSettings = new FitSettings(storage);
 let renderer, scene, camera, anchor, adjustment, occluder, watch;
@@ -101,7 +102,7 @@ function saveFit() {
   $('fit-saved').textContent = saved ? '이 브라우저에 자동 저장됐어요.' : '이 브라우저에서는 설정 저장을 사용할 수 없어요.';
 }
 function resetFit() {
-  applyFit(defaults); $('wrist-guide').checked = false; saveFit();
+  applyFit(defaultFit(engine, modelKey)); $('wrist-guide').checked = false; saveFit();
 }
 function updateMode(next) {
   diagnosticEvent('tracking-reset', { reason: 'camera-mode', nextMode: next });
@@ -144,7 +145,7 @@ async function loadDetector() {
   finally { detectorPromise = null; }
 }
 async function startCamera() {
-  if (!renderer) return;
+  if (!renderer || !testerModelReady) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     notice('카메라를 사용하려면 HTTPS 주소 또는 localhost로 열어 주세요. 휴대폰에서 PC의 http://192.168… 주소로 접속하면 카메라를 사용할 수 없습니다. 실행 안내를 확인해 주세요.', true);
     return;
@@ -333,7 +334,7 @@ function replaceModel(model) {
   if (watch) { adjustment.remove(watch); disposeModel(watch); }
   watch = model; adjustment.add(watch);
 }
-async function importModel(file) {
+async function importModel(file, profileKey) {
   if (!file) return;
   const id = ++modelOperation;
   $('model-status').textContent = '시계를 불러오고 있습니다…';
@@ -353,35 +354,64 @@ async function importModel(file) {
     loader = new GLTFLoader(manager).setDRACOLoader(draco);
     const gltf = await loader.parseAsync(buffer, ''); loaded = gltf.scene;
     if (id !== modelOperation) { disposeModel(loaded); loaded = null; return; }
-    const bounds = new THREE.Box3().setFromObject(loaded);
-    const size = bounds.getSize(new THREE.Vector3()), center = bounds.getCenter(new THREE.Vector3());
-    if (bounds.isEmpty() || size.x < 1e-8 || !Number.isFinite(size.length())) throw new Error('크기를 확인할 수 없는 모델입니다. 메시가 포함되어 있는지 확인해 주세요.');
-    // Keep the artist's local origin in Z for wrist contact. Center X/Y and normalize X width.
-    loaded.position.x -= center.x; loaded.position.y -= center.y;
-    const normalized = new THREE.Group(); normalized.scale.setScalar(1 / size.x); normalized.add(loaded);
+    const normalized = normalizeImportedWatch(loaded);
     replaceModel(normalized); loaded = null;
-    modelKey = 'glb:' + file.name + ':' + file.size; applyFit(fitSettings.load(engine, modelKey));
+    modelKey = profileKey || 'glb:' + file.name + ':' + file.size; applyFit(fitSettings.load(engine, modelKey));
     $('model-name').textContent = file.name.replace(/\.glb$/i, '');
     $('model-caption').textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB · 내 시계 모델`;
-    $('model-status').textContent = '불러왔습니다. 손목 모형으로 위치를 맞출 수 있어요. GLB의 스트랩 형태는 그대로 유지됩니다.';
+    $('model-status').textContent = normalized.userData.caseAnchored ? '케이스 중심·뒷면 기준으로 불러왔습니다. 스트랩은 모델의 고정된 형태이며 손목에 맞게 자동으로 휘어지지는 않습니다.' : '불러왔습니다. 손목 모형으로 위치를 맞출 수 있어요. GLB의 스트랩 형태는 그대로 유지됩니다.';
+    return true;
   } catch (error) {
     if (loaded) disposeModel(loaded);
     if (id === modelOperation) $('model-status').textContent = error.message || '모델을 불러오지 못했습니다. GLB 내보내기 설정을 확인해 주세요.';
+    return false;
   } finally { draco?.dispose(); if (id === modelOperation) $('model-file').value = ''; }
+}
+
+function testerModelState(state, message = '') {
+  if (!testerView) return;
+  testerModelReady = state === 'ready';
+  document.body.dataset.modelState = state;
+  $('start').disabled = state === 'loading';
+  $('start').textContent = state === 'loading' ? '시계 준비 중…' : state === 'error' ? '시계 다시 불러오기' : '카메라 시작';
+  $('tester-message').textContent = state === 'loading' ? '시계 모델을 준비하고 있어요.\n첫 접속에는 잠시 걸릴 수 있어요.' : '손등과 손가락을 화면에 담고\n약 2초 동안 가만히 보여 주세요.';
+  $('tester-error').hidden = state !== 'error';
+  $('tester-error').textContent = message;
+}
+async function loadDatejust() {
+  const button = $('datejust'), id = ++modelOperation;
+  if (button) button.disabled = true;
+  testerModelState('loading');
+  $('model-status').textContent = 'Datejust 모델을 내려받고 있습니다… (약 22MB)';
+  try {
+    const response = await fetch(new URL('./datejust-ar.glb?v=1', import.meta.url));
+    if (!response.ok) throw new Error('시계 모델을 내려받지 못했어요. 연결을 확인하고 다시 눌러 주세요.');
+    const blob = await response.blob();
+    if (id !== modelOperation) return;
+    const ready = await importModel(new File([blob], 'Rolex-Datejust-AR.glb', { type: 'model/gltf-binary' }), 'datejust');
+    testerModelState(ready ? 'ready' : 'error', ready ? '' : '시계 모델을 열지 못했어요. 다시 불러와 주세요.');
+  } catch (error) {
+    if (id === modelOperation) {
+      $('model-status').textContent = error.message || '모델을 불러오지 못했습니다.';
+      testerModelState('error', $('model-status').textContent);
+    }
+  } finally { if (button) button.disabled = false; }
 }
 
 try {
   renderer = new THREE.WebGLRenderer({ canvas: $('scene'), alpha: true, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
   renderer.setClearColor(0x000000, 0);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.35;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
   scene = new THREE.Scene();
   camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10000); camera.position.z = 2000;
-  scene.add(new THREE.HemisphereLight(0xe5faff, 0x19212e, 2));
-  const key = new THREE.DirectionalLight(0xffffff, 4); key.position.set(-200, 500, 800); scene.add(key);
-  const fill = new THREE.DirectionalLight(0xa2e8e2, 2); fill.position.set(400, -200, 500); scene.add(fill);
+  // Leave headroom for polished metal reflections in both preview and AR.
+  scene.add(new THREE.HemisphereLight(0xf4f7ff, 0x19212e, 0.5));
+  const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(-200, 500, 800); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xf1f5ff, 0.4); fill.position.set(400, -200, 500); scene.add(fill);
   const pmrem = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment();
   const environment = pmrem.fromScene(room, 0.04); scene.environment = environment.texture; pmrem.dispose(); room.dispose();
+  scene.environmentIntensity = 0.65;
   anchor = new WristRig(); adjustment = anchor.caseMount; occluder = anchor.occluder;
   scene.add(anchor); replaceModel(makeSampleWatch()); updateFit();
   new ResizeObserver(() => {
@@ -435,10 +465,13 @@ $('save-diagnostics').addEventListener('click',()=>{
   if(!diagnosticRecorder.frames.length && !diagnosticRecorder.renders.length)return;
   const time = performance.now(); diagnosticRecorder.stop(time, 'save');
   updateDiagnosticUi(time, true);
-  const blob=new Blob([JSON.stringify(diagnosticRecorder.export(time, {version:'0.7.15',engine,timeOrigin:performance.timeOrigin}))],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(diagnosticRecorder.export(time, {version:'0.7.19',engine,timeOrigin:performance.timeOrigin}))],{type:'application/json'});
   const url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='wrist-diagnostics.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
-$('start').addEventListener('click', () => mode === 'idle' ? startCamera() : stopCamera());
+$('start').addEventListener('click', () => {
+  if (testerView && !testerModelReady) { void loadDatejust(); return; }
+  mode === 'idle' ? startCamera() : stopCamera();
+});
 $('switch').addEventListener('click', () => { facingMode = mirror ? 'environment' : 'user'; stopCamera(); startCamera(); });
 $('model-file').addEventListener('change', event => importModel(event.target.files[0]));
 $('sample').addEventListener('click', () => {
@@ -448,3 +481,6 @@ $('sample').addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && mode !== 'idle') stopCamera('다른 화면으로 이동해 카메라를 껐습니다. 다시 시작하려면 카메라 시작을 눌러 주세요.'); });
 window.addEventListener('pagehide', () => { stopCamera(); });
+
+$('datejust')?.addEventListener('click', loadDatejust);
+if (renderer && (testerView || new URLSearchParams(location.search).get('model') === 'datejust')) void loadDatejust();
