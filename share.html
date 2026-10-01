@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#080a0b">
   <meta name="description" content="VIVER AR · 카메라로 손목에 시계를 착용해 보세요.">
   <title>VIVER AR · 시계 착용</title>
-  <link rel="stylesheet" href="./tester.css?v=713">
+  <link rel="stylesheet" href="./tester.css?v=715">
   <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
 </head>
 <body data-presentation="tester">
@@ -26,15 +26,21 @@
     </div>
   </section>
   <p id="tester-hint" class="hint" role="status" aria-live="polite" hidden>손등과 손가락을 펴고 잠깐 멈춰 주세요.</p>
-  <button id="calibrate" class="retrack" type="button" disabled hidden>
+  <div id="tester-actions" class="tester-actions" role="group" aria-label="카메라와 추적" hidden>
+  <button id="calibrate" class="retrack" type="button" disabled>
     <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M15.9 6.8A6.5 6.5 0 1 0 16.5 10M15.9 6.8V2.9m0 3.9H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     손등 재추적
   </button>
+  <button id="switch" class="retrack" type="button" disabled>
+    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M6 5H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2l-1-2H7L6 5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 9a3 3 0 0 1 5-1l1 1m0-2v2h-2M13 12a3 3 0 0 1-5 1l-1-1m0 2v-2h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    카메라 전환
+  </button>
+  </div>
   <!-- Shared engine controls are inert in the tester presentation. -->
   <div hidden aria-hidden="true">
     <span id="status"></span><span id="error" hidden></span>
     <span id="mode-label"></span><span id="camera-label"></span><span id="tracking-label"></span><span id="fps"></span>
-    <button id="switch" disabled></button><button id="align-dial"></button><button id="reset"></button><button id="sample"></button>
+    <button id="align-dial"></button><button id="reset"></button><button id="sample"></button>
     <input id="rear-assist" type="checkbox" checked><input id="rear-axis" type="checkbox" checked><input id="occlusion" type="checkbox" checked>
     <input id="debug" type="checkbox"><input id="wrist-guide" type="checkbox">
     <span id="debug-info"></span><span id="recording-status"></span><span id="recording-help"></span>
@@ -50,6 +56,6 @@
     <input id="height" type="number" value="0"><output id="height-output"></output>
   </div>
   <noscript><p class="no-script">카메라 착용을 시작하려면 JavaScript를 허용해 주세요.</p></noscript>
-  <script type="module" src="./app.js?v=714"></script>
+  <script type="module" src="./app.js?v=715"></script>
 </body>
 </html>

@@ -11,13 +11,15 @@ import { HandTarget } from './hand-target.js?v=73';
 import { makeSampleWatch, disposeModel, inspectGLB } from './watch.js?v=74';
 import { WristRig, wristDimensions } from './wrist-rig.js?v=71';
 import { DiagnosticRecorder } from './diagnostic-recorder.js?v=711';
-import { createTesterView } from './tester-view.js?v=714';
+import { createTesterView } from './tester-view.js?v=715';
+import { TesterReturnRecovery, hasVisiblePalm } from './tester-recovery.js?v=715';
 
 import { FIT_CONTROLS, FitSettings, defaultFit } from './fit-settings.js?v=7';
 
 const $ = id => document.getElementById(id);
 const video = $('camera'), stage = $('stage'), status = $('status'), errorBox = $('error');
 const testerView = createTesterView();
+const testerRecovery = testerView ? new TesterReturnRecovery() : null;
 const controls = FIT_CONTROLS;
 const engine = 'hand', defaults = defaultFit(engine);
 let modelKey = 'sample';
@@ -119,7 +121,8 @@ function updateMode(next) {
   $('rear-axis').disabled = next === 'loading' || (next === 'live' && mirror);
   debugFrame = null; debugContext.clearRect(0, 0, width, height);
   if (next === 'idle') $('debug-info').textContent = '카메라가 꺼졌습니다. 남아 있는 진단 기록은 저장할 수 있어요.';
-  testerView?.setMode(next);
+  testerRecovery?.reset();
+  testerView?.setMode(next, mirror);
 }
 function stopCamera(message = '카메라를 껐습니다. 시계 모델을 계속 살펴볼 수 있어요.') {
   operation++;
@@ -206,6 +209,11 @@ async function detect(time) {
     const next = estimateWristPose(landmarks, view, { mirror, offset: values.offset, scale: values.scale, worldLandmarks, calibrationBounds: testerView ? 'camera' : 'viewport' });
     const observation = assistEnabled ? rearObservation(next, landmarks, tracker, visual) : {allowed:true};
     const accepted = tracker.update(observation.allowed ? next : null, time);
+    if (testerRecovery?.update({ time, calibrated: !!tracker.orientationSign, accepted,
+      visibleHands: (result.landmarks || []).some(points => hasVisiblePalm(points, view, mirror)) ? result.landmarks.length : 0 })) {
+      diagnosticEvent('tracking-reset', { reason: 'tester-hand-return' });
+      tracker.reset(); handTarget.reset(); rearAxis.reset(); rearAssist.reset(); poseInitialized = false;
+    }
     const displayPose = accepted && tracker.orientationSign && rearAxisEnabled()
       ? rearAxis.update(tracker.pose, next, tracker.template, time) : tracker.pose;
     if (!accepted) rearAxis.interrupt();
@@ -285,7 +293,7 @@ function render(time) {
     occluder.visible = $('occlusion').checked;
   }
   renderer.render(scene, camera);
-  testerView?.tracking(tracker.orientationSign, tracker.diagnostics);
+  testerView?.tracking(tracker.orientationSign, tracker.diagnostics, anchor.visible, time);
   if (diagnosticRecorder.active) {
     const watchVisible = mode === 'live' && anchor.visible;
     diagnosticRecorder.recordRender({ time, mode, operation, watchVisible, inferenceTime: debugFrame?.time ?? null,
@@ -409,6 +417,7 @@ $('align-dial').addEventListener('click', () => {
 $('calibrate').addEventListener('click', () => {
   diagnosticEvent('tracking-reset', { reason: 'calibrate-button' });
   operation++;
+  testerRecovery?.reset();
   tracker.reset(); rearAxis.reset(); handTarget.reset(); rearAssist.reset(); poseInitialized = false;
   notice('손등과 손가락을 카메라 쪽으로 펴고 약 2초 동안 움직이지 않고 유지해 주세요. 손의 기준 형태와 회전을 다시 맞춥니다.');
 });
@@ -426,7 +435,7 @@ $('save-diagnostics').addEventListener('click',()=>{
   if(!diagnosticRecorder.frames.length && !diagnosticRecorder.renders.length)return;
   const time = performance.now(); diagnosticRecorder.stop(time, 'save');
   updateDiagnosticUi(time, true);
-  const blob=new Blob([JSON.stringify(diagnosticRecorder.export(time, {version:'0.7.14',engine,timeOrigin:performance.timeOrigin}))],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(diagnosticRecorder.export(time, {version:'0.7.15',engine,timeOrigin:performance.timeOrigin}))],{type:'application/json'});
   const url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='wrist-diagnostics.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 $('start').addEventListener('click', () => mode === 'idle' ? startCamera() : stopCamera());
